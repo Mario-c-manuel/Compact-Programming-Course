@@ -1,27 +1,30 @@
 package de.fhdo.sama.capstone;
 
 import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridLayout;
+import java.awt.event.ActionListener;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
-import javax.swing.JList;
 
 import de.fhdo.sama.capstone.model.AGV;
 import de.fhdo.sama.capstone.model.Location;
 import de.fhdo.sama.capstone.model.Medicine;
 import de.fhdo.sama.capstone.model.MedicineCategory;
-import de.fhdo.sama.capstone.model.Transfer;
 import de.fhdo.sama.capstone.model.Warehouse;
 
 public class App {
@@ -46,80 +49,78 @@ public class App {
     private void initializeGUI() {
         frame = new JFrame("Medicine Delivery Dashboard");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1200, 600);
+        frame.setSize(1400, 900);
 
-        JPanel mainPanel = new JPanel(new BorderLayout());
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
         // Warehouse Panel
-        JPanel warehousePanel = new JPanel(new BorderLayout());
-        warehousePanel.setBorder(BorderFactory.createTitledBorder("Warehouses"));
-        warehouseArea = new JTextArea();
-        warehouseArea.setEditable(false);
-        warehouseList = new JList<>(new String[]{"Main Warehouse", "Secondary Warehouse"});
-        warehousePanel.add(new JScrollPane(warehouseList), BorderLayout.CENTER);
+        JPanel warehousePanel = createPanel("Warehouses", warehouseList = new JList<>(new String[]{"Main Warehouse", "Secondary Warehouse"}));
 
         // AGV Panel
-        JPanel agvPanel = new JPanel(new BorderLayout());
-        agvPanel.setBorder(BorderFactory.createTitledBorder("AGV Operations"));
-        agvArea = new JTextArea();
-        agvArea.setEditable(false);
-        agvPanel.add(new JScrollPane(agvArea), BorderLayout.CENTER);
+        JPanel agvPanel = createPanel("AGV Operations", agvArea = createTextArea(15));
 
         // Hospital Panel
-        JPanel hospitalPanel = new JPanel(new BorderLayout());
-        hospitalPanel.setBorder(BorderFactory.createTitledBorder("Hospitals"));
-        hospitalArea = new JTextArea();
-        hospitalArea.setEditable(false);
-        hospitalList = new JList<>(new String[]{"City Hospital", "Rural Clinic"});
-        hospitalPanel.add(new JScrollPane(hospitalList), BorderLayout.CENTER);
+        JPanel hospitalPanel = createPanel("Hospitals", hospitalList = new JList<>(new String[]{"City Hospital", "Rural Clinic"}));
 
         // Medicine Panel
-        JPanel medicinePanel = new JPanel(new BorderLayout());
-        medicinePanel.setBorder(BorderFactory.createTitledBorder("Medicines"));
-        medicineList = new JList<>(new String[]{"Med1", "Med2", "Med3"});
-        medicinePanel.add(new JScrollPane(medicineList), BorderLayout.CENTER);
+        JPanel medicinePanel = createPanel("Medicines", medicineList = new JList<>(new String[]{"Med1", "Med2", "Med3"}));
 
         // Charging Station Panel
-        JPanel chargingStationPanel = new JPanel(new BorderLayout());
-        chargingStationPanel.setBorder(BorderFactory.createTitledBorder("Charging Stations"));
-        chargingStationList = new JList<>(new String[]{"Station 1", "Station 2"});
-        chargingStationPanel.add(new JScrollPane(chargingStationList), BorderLayout.CENTER);
+        JPanel chargingStationPanel = createPanel("Charging Stations", chargingStationList = new JList<>(new String[]{"Station 1", "Station 2"}));
 
         // Control Panel
-        JPanel controlPanel = new JPanel();
-        JButton startDeliveryButton = new JButton("Start Delivery");
-        startDeliveryButton.addActionListener(_ -> startDelivery());
-        controlPanel.add(startDeliveryButton);
+        JPanel controlPanel = new JPanel(new GridLayout(2, 1, 10, 10));
+        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        actionPanel.add(createButton("Start Delivery", _ -> startDelivery()));
+        actionPanel.add(createButton("Charge AGV", _ -> chargeAGV()));
 
-        JButton chargeButton = new JButton("Charge AGV");
-        chargeButton.addActionListener(_ -> chargeAGV());
-        controlPanel.add(chargeButton);
-
-        JLabel medicineLabel = new JLabel("Medicine:");
+        JPanel orderPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        orderPanel.add(new JLabel("Medicine:"));
         medicineField = new JTextField(10);
-        JLabel quantityLabel = new JLabel("Quantity:");
+        orderPanel.add(medicineField);
+        orderPanel.add(new JLabel("Quantity:"));
         quantityField = new JTextField(5);
-        JButton orderButton = new JButton("Place Order");
-        orderButton.addActionListener(_ -> placeOrder());
+        orderPanel.add(quantityField);
+        orderPanel.add(createButton("Place Order", _ -> placeOrder()));
 
-        controlPanel.add(medicineLabel);
-        controlPanel.add(medicineField);
-        controlPanel.add(quantityLabel);
-        controlPanel.add(quantityField);
-        controlPanel.add(orderButton);
+        controlPanel.add(actionPanel);
+        controlPanel.add(orderPanel);
 
-        JPanel listPanel = new JPanel(new GridLayout(1, 4));
+        JPanel listPanel = new JPanel(new GridLayout(1, 4, 10, 10));
         listPanel.add(warehousePanel);
         listPanel.add(hospitalPanel);
         listPanel.add(medicinePanel);
         listPanel.add(chargingStationPanel);
 
-        mainPanel.add(listPanel, BorderLayout.NORTH);
-        mainPanel.add(agvPanel, BorderLayout.CENTER);
-        mainPanel.add(controlPanel, BorderLayout.SOUTH);
+        mainPanel.add(listPanel, BorderLayout.CENTER);
+        mainPanel.add(agvPanel, BorderLayout.SOUTH);
+        mainPanel.add(controlPanel, BorderLayout.NORTH);
 
         frame.add(mainPanel);
         frame.setVisible(true);
+    }
+
+    private JPanel createPanel(String title, JComponent component) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder(title));
+        panel.add(new JScrollPane(component), BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JTextArea createTextArea(int rows) {
+        JTextArea textArea = new JTextArea();
+        textArea.setEditable(false);
+        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        textArea.setRows(rows);
+        return textArea;
+    }
+
+    private JButton createButton(String text, ActionListener action) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Arial", Font.BOLD, 14));
+        button.addActionListener(action);
+        return button;
     }
 
     private void startDelivery() {
@@ -148,15 +149,6 @@ public class App {
 
                 Thread.sleep(2000); // Simulate delivery time
 
-                // Create a transfer object to represent the delivery
-                Transfer transfer = new Transfer();
-                transfer.setId("T1");
-                transfer.setCargo(new Medicine("Med1", 10, MedicineCategory.CURATIVE_MEDICINES));
-                transfer.setFrom(warehouseLocation);
-                transfer.setTo(hospitalLocation);
-                transfer.setExecuter(agv);
-
-                // Simulate completing the delivery
                 logAGVOperation(agv.getName() + " delivered 10 units of Med1 to " + hospitalLocation.name() + ".");
             } catch (InterruptedException e) {
                 logAGVOperation(agv.getName() + " was interrupted.");
