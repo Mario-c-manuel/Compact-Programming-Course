@@ -59,7 +59,7 @@ public class App {
 	}
 
 	private void initializeGUI() {
-		frame = new JFrame("Medicine Delivery Dashboard");
+		frame = new JFrame("MediTrack Dashboard");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setSize(1200, 700);
 		frame.setLocationRelativeTo(null);
