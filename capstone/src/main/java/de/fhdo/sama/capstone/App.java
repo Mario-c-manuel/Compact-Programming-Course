@@ -5,7 +5,6 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionListener;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -20,6 +19,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 import de.fhdo.sama.capstone.model.AGV;
 import de.fhdo.sama.capstone.model.Location;
@@ -27,189 +28,370 @@ import de.fhdo.sama.capstone.model.Medicine;
 import de.fhdo.sama.capstone.model.MedicineCategory;
 import de.fhdo.sama.capstone.model.Warehouse;
 
+/**
+ * Main application class for the Medicine Delivery Dashboard. Handles GUI setup
+ * and user interactions.
+ */
 public class App {
-    private JFrame frame;
-    private JTextArea warehouseArea;
-    private JTextArea agvArea;
-    private JTextArea hospitalArea;
-    private JTextField medicineField;
-    private JTextField quantityField;
-    private ExecutorService executor;
+	// --- GUI Components ---
+	private JFrame frame;
+	private JTextArea agvArea;
+	private JList<String> hospitalList;
+	private JList<String> warehouseList;
+	private JList<String> medicineList;
+	private JList<String> chargingStationList;
+	private JTextField quantityField; // Make quantity field a class member for easier access
 
-    private JList<String> hospitalList;
-    private JList<String> warehouseList;
-    private JList<String> medicineList;
-    private JList<String> chargingStationList;
+	// --- Backend/Service ---
+	private final DeliveryService deliveryService;
+	private final ExecutorService executor;
+	private final AppConfig config;
 
-    public App() {
-        executor = Executors.newCachedThreadPool();
-        initializeGUI();
-    }
+	private int medicineIdCounter = 1000;
 
-    private void initializeGUI() {
-        frame = new JFrame("Medicine Delivery Dashboard");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(1400, 900);
+	/**
+	 * Constructs the application and initializes the GUI.
+	 */
+	public App() {
+		this.executor = Executors.newCachedThreadPool();
+		this.deliveryService = new DeliveryService();
+		this.config = new AppConfig();
+		this.config.loadDefaults();
+		initializeGUI();
+	}
 
-        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+	/**
+	 * Initializes the main GUI layout and components.
+	 */
+	private void initializeGUI() {
+		frame = new JFrame("Medicine Delivery Dashboard");
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setSize(1200, 800);
+		frame.setLocationRelativeTo(null);
 
-        // Warehouse Panel
-        JPanel warehousePanel = createPanel("Warehouses", warehouseList = new JList<>(new String[]{"Main Warehouse", "Secondary Warehouse"}));
+		// Main container with BorderLayout
+		JPanel mainPanel = new JPanel(new BorderLayout(15, 15));
+		mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
-        // AGV Panel
-        JPanel agvPanel = createPanel("AGV Operations", agvArea = createTextArea(15));
+		// --- Left: Entity Lists ---
+		JPanel listsPanel = new JPanel(new GridLayout(4, 1, 10, 10));
+		listsPanel.setBorder(BorderFactory.createTitledBorder("Entities"));
+		listsPanel.add(createListPanel("Warehouses", warehouseList));
+		listsPanel.add(createListPanel("Hospitals", hospitalList));
+		listsPanel.add(createListPanel("Medicines", medicineList));
+		listsPanel.add(createListPanel("Charging Stations", chargingStationList));
 
-        // Hospital Panel
-        JPanel hospitalPanel = createPanel("Hospitals", hospitalList = new JList<>(new String[]{"City Hospital", "Rural Clinic"}));
+		// --- Center: Actions and Order ---
+		JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
+		centerPanel.add(createActionPanel(), BorderLayout.NORTH);
+		centerPanel.add(createOrderPanel(), BorderLayout.CENTER);
 
-        // Medicine Panel
-        JPanel medicinePanel = createPanel("Medicines", medicineList = new JList<>(new String[]{"Med1", "Med2", "Med3"}));
+		// --- Right: Configuration ---
+		JPanel configPanel = createConfigPanel();
 
-        // Charging Station Panel
-        JPanel chargingStationPanel = createPanel("Charging Stations", chargingStationList = new JList<>(new String[]{"Station 1", "Station 2"}));
+		// --- Bottom: AGV Log ---
+		agvArea = createTextArea(10);
+		agvArea.setToolTipText("AGV operations and system log");
+		JScrollPane agvScroll = new JScrollPane(agvArea);
+		agvScroll.setBorder(BorderFactory.createTitledBorder("AGV Operations Log"));
+		agvScroll.setPreferredSize(new java.awt.Dimension(0, 180));
 
-        // Control Panel
-        JPanel controlPanel = new JPanel(new GridLayout(2, 1, 10, 10));
-        JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
-        actionPanel.add(createButton("Start Delivery", _ -> startDelivery()));
-        actionPanel.add(createButton("Charge AGV", _ -> chargeAGV()));
+		// --- Assemble main layout ---
+		mainPanel.add(listsPanel, BorderLayout.WEST);
+		mainPanel.add(centerPanel, BorderLayout.CENTER);
+		mainPanel.add(configPanel, BorderLayout.EAST);
+		mainPanel.add(agvScroll, BorderLayout.SOUTH);
 
-        JPanel orderPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
-        orderPanel.add(new JLabel("Medicine:"));
-        medicineField = new JTextField(10);
-        orderPanel.add(medicineField);
-        orderPanel.add(new JLabel("Quantity:"));
-        quantityField = new JTextField(5);
-        orderPanel.add(quantityField);
-        orderPanel.add(createButton("Place Order", _ -> placeOrder()));
+		frame.setContentPane(mainPanel);
+		frame.setVisible(true);
+	}
 
-        controlPanel.add(actionPanel);
-        controlPanel.add(orderPanel);
+	private JPanel createListPanel(String title, JList<String> list) {
+		JPanel panel = new JPanel(new BorderLayout());
+		panel.setBorder(BorderFactory.createTitledBorder(title));
+		JScrollPane scroll = new JScrollPane(list);
+		scroll.setPreferredSize(new java.awt.Dimension(180, 80));
+		panel.add(scroll, BorderLayout.CENTER);
+		return panel;
+	}
 
-        JPanel listPanel = new JPanel(new GridLayout(1, 4, 10, 10));
-        listPanel.add(warehousePanel);
-        listPanel.add(hospitalPanel);
-        listPanel.add(medicinePanel);
-        listPanel.add(chargingStationPanel);
+	/**
+	 * Creates the action panel with delivery and charge buttons.
+	 */
+	private JPanel createActionPanel() {
+		JPanel actionPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10)); // More spacing
+		JButton startDeliveryBtn = createButton("Start Delivery", e -> onStartDelivery());
+		startDeliveryBtn.setToolTipText("Start delivery from selected warehouse to selected hospital");
+		JButton chargeAgvBtn = createButton("Charge AGV", e -> onChargeAGV());
+		chargeAgvBtn.setToolTipText("Send AGV to charging station");
+		actionPanel.add(startDeliveryBtn);
+		actionPanel.add(chargeAgvBtn);
+		return actionPanel;
+	}
 
-        mainPanel.add(listPanel, BorderLayout.CENTER);
-        mainPanel.add(agvPanel, BorderLayout.SOUTH);
-        mainPanel.add(controlPanel, BorderLayout.NORTH);
+	/**
+	 * Creates the order panel with medicine/quantity fields and order button.
+	 */
+	private JPanel createOrderPanel() {
+		JPanel orderPanel = new JPanel(new GridLayout(3, 2, 10, 10));
+		orderPanel.setBorder(BorderFactory.createTitledBorder("Place Medicine Order"));
+		orderPanel.add(new JLabel("Select Medicine:"));
+		orderPanel.add(new JScrollPane(medicineList));
+		orderPanel.add(new JLabel("Quantity:"));
+		quantityField = new JTextField(5);
+		quantityField.setToolTipText("Enter quantity to order");
+		orderPanel.add(quantityField);
+		JButton orderButton = createButton("Place Order", e -> onPlaceOrder(quantityField));
+		orderButton.setToolTipText("Place an order for the selected medicine");
+		orderPanel.add(new JLabel()); // Empty cell for alignment
+		orderPanel.add(orderButton);
+		return orderPanel;
+	}
 
-        frame.add(mainPanel);
-        frame.setVisible(true);
-    }
+	private JPanel createPanel(String title, JComponent component) {
+		JPanel panel = new JPanel(new BorderLayout());
+		panel.setBorder(BorderFactory.createTitledBorder(title));
+		panel.add(new JScrollPane(component), BorderLayout.CENTER);
+		return panel;
+	}
 
-    private JPanel createPanel(String title, JComponent component) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createTitledBorder(title));
-        panel.add(new JScrollPane(component), BorderLayout.CENTER);
-        return panel;
-    }
+	/**
+	 * Creates a non-editable text area.
+	 */
+	private JTextArea createTextArea(int rows) {
+		JTextArea textArea = new JTextArea();
+		textArea.setEditable(false);
+		textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+		textArea.setRows(rows);
+		return textArea;
+	}
 
-    private JTextArea createTextArea(int rows) {
-        JTextArea textArea = new JTextArea();
-        textArea.setEditable(false);
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        textArea.setRows(rows);
-        return textArea;
-    }
+	/**
+	 * Creates a button with the given text and action.
+	 */
+	private JButton createButton(String text, ActionListener action) {
+		JButton button = new JButton(text);
+		button.setFont(new Font("Arial", Font.BOLD, 14));
+		button.addActionListener(action);
+		return button;
+	}
 
-    private JButton createButton(String text, ActionListener action) {
-        JButton button = new JButton(text);
-        button.setFont(new Font("Arial", Font.BOLD, 14));
-        button.addActionListener(action);
-        return button;
-    }
+	/**
+	 * Creates the configuration panel with buttons for adding entities.
+	 */
+	private JPanel createConfigPanel() {
+		JPanel configPanel = new JPanel(new GridLayout(4, 1, 10, 10)); // Vertical, more spacing
+		JButton addWarehouseBtn = createButton("Add Warehouse", e -> onAddWarehouse());
+		addWarehouseBtn.setToolTipText("Add a new warehouse to the system");
+		JButton addMedicineBtn = createButton("Add Medicine", e -> onAddMedicine());
+		addMedicineBtn.setToolTipText("Add a new medicine to the system");
+		JButton addLocationBtn = createButton("Add Location", e -> onAddLocation());
+		addLocationBtn.setToolTipText("Add a new location to the system");
+		JButton addChargingStationBtn = createButton("Add Charging Station", e -> onAddChargingStation());
+		addChargingStationBtn.setToolTipText("Add a new charging station");
+		configPanel.add(addWarehouseBtn);
+		configPanel.add(addMedicineBtn);
+		configPanel.add(addLocationBtn);
+		configPanel.add(addChargingStationBtn);
+		configPanel.setBorder(BorderFactory.createTitledBorder("Configuration"));
+		return configPanel;
+	}
 
-    private void startDelivery() {
-        AGV agv = new AGV("AGV-1");
-        Location warehouseLocation = new Location("W1", "Main Warehouse", 0, 0);
-        Location hospitalLocation = new Location("H1", "City Hospital", 10, 10);
-        Warehouse warehouse = new Warehouse("Main Warehouse", List.of(new Medicine("Med1", 100, MedicineCategory.CURATIVE_MEDICINES)), warehouseLocation);
+	// --- Event Handlers ---
 
-        executor.submit(() -> {
-            try {
-                if (agv.getBatteryLevel() < 20) {
-                    logAGVOperation(agv.getName() + " battery low. Automatically charging.");
-                    chargeAGV(agv);
-                }
+	/**
+	 * Handles the Start Delivery button action.
+	 */
+	private void onStartDelivery() {
+		String selectedWarehouse = warehouseList.getSelectedValue();
+		String selectedHospital = hospitalList.getSelectedValue();
+		String selectedMedicine = medicineList.getSelectedValue();
+		int quantity = 1;
+		try {
+			if (quantityField != null) {
+				quantity = Integer.parseInt(quantityField.getText());
+			}
+		} catch (Exception ex) {
+			quantity = 1;
+		}
+		if (selectedWarehouse == null || selectedHospital == null || selectedMedicine == null || quantity <= 0) {
+			logAGVOperation("Please select a warehouse, hospital, medicine, and enter a valid quantity.");
+			return;
+		}
+		Warehouse warehouse = config.getWarehouses().stream()
+			.filter(w -> w.getName().equals(selectedWarehouse))
+			.findFirst().orElse(null);
+		if (warehouse == null) {
+			logAGVOperation("Warehouse not found in config.");
+			return;
+		}
+		Location warehouseLocation = warehouse.getLocation();
+		Location hospitalLocation = config.getLocations().stream()
+			.filter(l -> l.name().equals(selectedHospital))
+			.findFirst().orElse(new Location("H1", selectedHospital, 0, 0));
+		deliveryService.startDelivery(warehouseLocation, hospitalLocation, warehouse, selectedMedicine, quantity, this::logAGVOperation);
+	}
 
-                logAGVOperation(agv.getName() + " started delivery.");
+	/**
+	 * Handles the Place Order button action.
+	 */
+	private void onPlaceOrder(JTextField quantityField) {
+		String medicineName = medicineList.getSelectedValue();
+		if (medicineName == null) {
+			javax.swing.JOptionPane.showMessageDialog(frame, "Please select a medicine from the list.", "Order Error",
+					javax.swing.JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		int quantity;
+		try {
+			quantity = Integer.parseInt(quantityField.getText());
+		} catch (NumberFormatException ex) {
+			javax.swing.JOptionPane.showMessageDialog(frame, "Invalid quantity.", "Order Error",
+					javax.swing.JOptionPane.ERROR_MESSAGE);
+			quantityField.setText("");
+			quantityField.requestFocusInWindow();
+			return;
+		}
+		String selectedWarehouse = warehouseList.getSelectedValue();
+		if (selectedWarehouse == null) {
+			javax.swing.JOptionPane.showMessageDialog(frame, "Please select a warehouse.", "Order Error",
+					javax.swing.JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		Warehouse warehouse = config.getWarehouses().stream().filter(w -> w.getName().equals(selectedWarehouse))
+				.findFirst().orElse(null);
+		if (warehouse == null) {
+			javax.swing.JOptionPane.showMessageDialog(frame, "Warehouse not found in config.", "Order Error",
+					javax.swing.JOptionPane.ERROR_MESSAGE);
+			return;
+		}
+		deliveryService.placeOrder(warehouse, medicineName, quantity, this::logAGVOperation);
+		quantityField.setText("");
+		quantityField.requestFocusInWindow();
+	}
 
-                // Simulate picking up medicine from the warehouse
-                boolean success = warehouse.removeMedicine("Med1", 10);
-                if (success) {
-                    logAGVOperation(agv.getName() + " picked up 10 units of Med1.");
-                } else {
-                    logAGVOperation(agv.getName() + " failed to pick up medicine. Not enough stock.");
-                    return;
-                }
+	/**
+	 * Handles the Charge AGV button action.
+	 */
+	private void onChargeAGV() {
+		AGV agv = new AGV("AGV-1");
+		executor.submit(() -> {
+			try {
+				logAGVOperation(agv.getName() + " is charging at Station 1.");
+				Thread.sleep(3000); // Simulate charging time
+				agv.setBatteryLevel(100);
+				logAGVOperation(agv.getName() + " is fully charged.");
+			} catch (InterruptedException e) {
+				logAGVOperation(agv.getName() + " charging was interrupted.");
+			}
+		});
+	}
 
-                Thread.sleep(2000); // Simulate delivery time
+	private void onAddWarehouse() {
+		String name = javax.swing.JOptionPane.showInputDialog(frame, "Warehouse name:");
+		if (name == null || name.isBlank())
+			return;
+		Location location = new Location("W" + (config.getLocations().size() + 1), name, 0, 0);
+		config.getLocations().add(location);
+		Warehouse warehouse = new Warehouse(name, new java.util.ArrayList<>(config.getMedicines()), location);
+		config.getWarehouses().add(warehouse);
+		updateWarehouseList();
+		// Select and scroll to new warehouse
+		warehouseList.setSelectedIndex(warehouseList.getModel().getSize() - 1);
+		warehouseList.ensureIndexIsVisible(warehouseList.getModel().getSize() - 1);
+		javax.swing.JOptionPane.showMessageDialog(frame, "Warehouse '" + name + "' added successfully.", "Success",
+				javax.swing.JOptionPane.INFORMATION_MESSAGE);
+	}
 
-                logAGVOperation(agv.getName() + " delivered 10 units of Med1 to " + hospitalLocation.name() + ".");
-            } catch (InterruptedException e) {
-                logAGVOperation(agv.getName() + " was interrupted.");
-            }
-        });
-    }
+	private void onAddMedicine() {
+		String name = javax.swing.JOptionPane.showInputDialog(frame, "Medicine name:");
+		if (name == null || name.isBlank())
+			return;
+		String id = "M" + (medicineIdCounter++);
+		Medicine med = new Medicine(id, name, 100, MedicineCategory.CURATIVE_MEDICINES);
+		config.getMedicines().add(med);
+		updateMedicineList();
+		// Select and scroll to new medicine
+		medicineList.setSelectedIndex(medicineList.getModel().getSize() - 1);
+		medicineList.ensureIndexIsVisible(medicineList.getModel().getSize() - 1);
+		javax.swing.JOptionPane.showMessageDialog(frame, "Medicine '" + name + "' added successfully.", "Success",
+				javax.swing.JOptionPane.INFORMATION_MESSAGE);
+	}
 
-    private void placeOrder() {
-        String medicineName = medicineField.getText();
-        int quantity;
-        try {
-            quantity = Integer.parseInt(quantityField.getText());
-        } catch (NumberFormatException e) {
-            logHospitalOperation("Invalid quantity.");
-            return;
-        }
+	private void onAddLocation() {
+		String name = javax.swing.JOptionPane.showInputDialog(frame, "Location name:");
+		if (name == null || name.isBlank())
+			return;
+		Location loc = new Location("L" + (config.getLocations().size() + 1), name, 0, 0);
+		config.getLocations().add(loc);
+		javax.swing.JOptionPane.showMessageDialog(frame, "Location '" + name + "' added successfully.", "Success",
+				javax.swing.JOptionPane.INFORMATION_MESSAGE);
+	}
 
-        Warehouse warehouse = new Warehouse("Main Warehouse", List.of(new Medicine("Med1", 100, MedicineCategory.CURATIVE_MEDICINES)), new Location("W1", "Main Warehouse", 0, 0));
-        boolean success = warehouse.removeMedicine(medicineName, quantity);
+	private void onAddChargingStation() {
+		String name = javax.swing.JOptionPane.showInputDialog(frame, "Charging Station name:");
+		if (name == null || name.isBlank())
+			return;
+		config.getChargingStations().add(name);
+		updateChargingStationList();
+		// Select and scroll to new charging station
+		chargingStationList.setSelectedIndex(chargingStationList.getModel().getSize() - 1);
+		chargingStationList.ensureIndexIsVisible(chargingStationList.getModel().getSize() - 1);
+		javax.swing.JOptionPane.showMessageDialog(frame, "Charging Station '" + name + "' added successfully.",
+				"Success", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+	}
 
-        if (success) {
-            logHospitalOperation("Order placed: " + quantity + " units of " + medicineName + " delivered.");
-        } else {
-            logHospitalOperation("Order failed: Not enough stock of " + medicineName + ".");
-        }
-    }
+	private void updateWarehouseList() {
+		warehouseList.setListData(config.getWarehouses().stream().map(Warehouse::getName).toArray(String[]::new));
+		// Reselect the last item if available
+		if (warehouseList.getModel().getSize() > 0) {
+			warehouseList.setSelectedIndex(warehouseList.getModel().getSize() - 1);
+		}
+	}
 
-    private void chargeAGV() {
-        AGV agv = new AGV("AGV-1");
-        executor.submit(() -> {
-            try {
-                logAGVOperation(agv.getName() + " is charging at Station 1.");
-                Thread.sleep(3000); // Simulate charging time
-                agv.setBatteryLevel(100);
-                logAGVOperation(agv.getName() + " is fully charged.");
-            } catch (InterruptedException e) {
-                logAGVOperation(agv.getName() + " charging was interrupted.");
-            }
-        });
-    }
+	private void updateMedicineList() {
+		medicineList.setListData(config.getMedicines().stream().map(Medicine::getName).toArray(String[]::new));
+		if (medicineList.getModel().getSize() > 0) {
+			medicineList.setSelectedIndex(medicineList.getModel().getSize() - 1);
+		}
+	}
 
-    private void chargeAGV(AGV agv) {
-        try {
-            logAGVOperation(agv.getName() + " is charging at Station 1.");
-            Thread.sleep(3000); // Simulate charging time
-            agv.setBatteryLevel(100);
-            logAGVOperation(agv.getName() + " is fully charged.");
-        } catch (InterruptedException e) {
-            logAGVOperation(agv.getName() + " charging was interrupted.");
-        }
-    }
+	private void updateChargingStationList() {
+		chargingStationList.setListData(config.getChargingStations().toArray(new String[0]));
+		if (chargingStationList.getModel().getSize() > 0) {
+			chargingStationList.setSelectedIndex(chargingStationList.getModel().getSize() - 1);
+		}
+	}
 
-    private void logAGVOperation(String message) {
-        SwingUtilities.invokeLater(() -> agvArea.append(message + "\n"));
-    }
+	/**
+	 * Appends a message to the AGV log area.
+	 */
+	private void logAGVOperation(String message) {
+		SwingUtilities.invokeLater(() -> agvArea.append(message + "\n"));
+	}
 
-    private void logHospitalOperation(String message) {
-        SwingUtilities.invokeLater(() -> hospitalArea.append(message + "\n"));
-    }
+	// --- List selection handlers ---
+	private void onWarehouseSelected() {
+		String selected = warehouseList.getSelectedValue();
+		logAGVOperation("Selected warehouse: " + (selected != null ? selected : "None"));
+	}
+	private void onHospitalSelected() {
+		String selected = hospitalList.getSelectedValue();
+		logAGVOperation("Selected hospital: " + (selected != null ? selected : "None"));
+	}
+	private void onMedicineSelected() {
+		String selected = medicineList.getSelectedValue();
+		logAGVOperation("Selected medicine: " + (selected != null ? selected : "None"));
+	}
+	private void onChargingStationSelected() {
+		String selected = chargingStationList.getSelectedValue();
+		logAGVOperation("Selected charging station: " + (selected != null ? selected : "None"));
+	}
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(App::new);
-    }
+	/**
+	 * Application entry point.
+	 */
+	public static void main(String[] args) {
+		SwingUtilities.invokeLater(App::new);
+	}
 }

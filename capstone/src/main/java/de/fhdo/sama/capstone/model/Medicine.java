@@ -6,7 +6,8 @@ public class Medicine {
 	private int quantity;
 	private MedicineCategory category;
 
-	public Medicine(String name, int quantity, MedicineCategory category) {
+	public Medicine(String id, String name, int quantity, MedicineCategory category) {
+		this.id = id;
 		this.name = name;
 		this.quantity = quantity;
 		this.category = category;
@@ -39,7 +40,7 @@ public class Medicine {
 		}
 
 		public Medicine build() {
-			return new Medicine(name, quantity, category);
+			return new Medicine(id, name, quantity, category);
 		}
 	}
 
