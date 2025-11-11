@@ -46,7 +46,7 @@ public class Warehouse {
 		this.name = name;
 	}
 
-	public boolean removeMedicine(String medicineName, int quantity) {
+	public synchronized boolean removeMedicine(String medicineName, int quantity) {
 		for (Medicine medicine : stock) {
 			if (medicine.getName().equals(medicineName) && medicine.getQuantity() >= quantity) {
 				medicine.setQuantity(medicine.getQuantity() - quantity);
@@ -56,7 +56,7 @@ public class Warehouse {
 		return false;
 	}
 
-	public void addMedicine(Medicine medicine) {
+	public synchronized void addMedicine(Medicine medicine) {
 		stock.add(medicine);
 	}
 }
