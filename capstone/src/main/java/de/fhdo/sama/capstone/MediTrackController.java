@@ -306,11 +306,22 @@ public class MediTrackController {
     private void refreshWarehouseList() {
         Platform.runLater(() -> {
             ObservableList<String> items = FXCollections.observableArrayList();
-            // Using Warehouse name and stock count directly
+            // Display warehouse with individual medicine stock items
             for (Warehouse w : warehouses) {
-                // Assuming getMedicines() returns a collection and getSize() is available or size() works
-                int totalStock = w.getMedicines().stream().mapToInt(Medicine::getQuantity).sum();
-                items.add(String.format("%s (ID: %s) | Stock Items: %d", w.getName(), w.getId(), totalStock));
+                // Add warehouse header
+                items.add(String.format(">> %s (ID: %s):", w.getName(), w.getId()));
+                
+                // Add each medicine with its quantity
+                List<Medicine> medicines = w.getMedicines();
+                if (medicines.isEmpty()) {
+                    items.add("    - No medicines in stock");
+                } else {
+                    for (Medicine m : medicines) {
+                        items.add(String.format("    - %s: %d units", m.getName(), m.getQuantity()));
+                    }
+                }
+                // Add empty line between warehouses for readability
+                items.add("");
             }
             warehouseList.setItems(items);
         });
