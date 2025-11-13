@@ -14,7 +14,6 @@ import de.fhdo.sama.capstone.model.*;
 
 public class MediTrackController {
 
-    // --- FXML UI Elements reverted to use String for simpler ListViews ---
     @FXML private ListView<String> warehouseList;
     @FXML private ListView<String> hospitalList;
     @FXML private ListView<String> medicineList;
@@ -44,18 +43,10 @@ public class MediTrackController {
 
     @FXML
     public void initialize() {
-        // Use Platform.runLater to ensure initialization runs after the FXML has fully loaded
-        Platform.runLater(() -> {
-            loadInitialMockData();
-            bindUI();
-            // Call refresh methods to populate lists immediately
-            refreshWarehouseList();
-            refreshHospitalList();
-            refreshMedicineList();
-            refreshAgvList();
-            startBatteryAndAgvMonitoring();
-            log("System initialized. Welcome to Meditrack.");
-        });
+        loadInitialMockData();
+        bindUI();
+        startBatteryAndAgvMonitoring();
+        log("System initialized.");
     }
 
     private void loadInitialMockData() {
@@ -67,45 +58,45 @@ public class MediTrackController {
         Warehouse w2 = new Warehouse("wh2", "Secondary Warehouse", new Location("W2", "Secondary Warehouse", 50, 0));
         warehouses.addAll(Arrays.asList(w1, w2));
 
-        // Note: medicines here represents all available types, not current stock
         medicines.add(new Medicine("med1", "Artemether/Lumefantrine (20/120mg)", 2500, LocalDate.parse("2025-12-31"), "wh1", "Shelf A1", "Antimalarial", 500, 3.50));
         medicines.add(new Medicine("med2", "Azithromycin 500mg", 90, LocalDate.parse("2024-10-31"), "wh2", "Rack B2", "Antibiotic", 150, 0.75));
         medicines.add(new Medicine("med3", "TLD (Tenofovir/Lamivudine/Dolutegravir)", 800, LocalDate.parse("2026-06-30"), "wh1", "Shelf A2", "Antiretroviral", 200, 7.20));
 
-        // populate warehouses with medicine references (actual stock)
+        // populate warehouses with medicine references
         for (Medicine m : medicines) {
             Warehouse target = warehouses.stream().filter(w -> w.getId().equals(m.getWarehouseId())).findFirst().orElse(warehouses.get(0));
             target.addMedicine(new Medicine(m)); // add a copy
         }
 
         // Hospitals
-        // Assuming Hospital constructor is Hospital(String id, String name, String location)
         hospitals.add(new Hospital("h1", "City Hospital", "Nairobi, Kenya"));
         hospitals.add(new Hospital("h2", "Rural Clinic", "Outskirts"));
 
         // AGVs
-        // Assuming AGV constructor is AGV(String id, String name, Status status, int battery, String location, String task)
         agvs.add(new AGV("agv-001", "PharmaBot Alpha", AGV.Status.IDLE, 85, "Main Warehouse", null));
         agvs.add(new AGV("agv-002", "PharmaBot Beta", AGV.Status.CHARGING, 22, "Main Warehouse", null));
         agvs.add(new AGV("agv-003", "MediMover Gamma", AGV.Status.ON_TASK, 67, "Mogadishu MedHub", "Transferring Azithromycin"));
     }
 
     private void bindUI() {
-        // Lists for ChoiceBoxes (using names)
         ObservableList<String> whNames = FXCollections.observableArrayList();
         warehouses.forEach(w -> whNames.add(w.getName()));
+        warehouseList.setItems(whNames);
         warehouseChoice.setItems(whNames);
 
         ObservableList<String> hospNames = FXCollections.observableArrayList();
         hospitals.forEach(h -> hospNames.add(h.getName()));
+        hospitalList.setItems(hospNames);
         hospitalChoice.setItems(hospNames);
 
         ObservableList<String> medNames = FXCollections.observableArrayList();
         medicines.forEach(m -> medNames.add(m.getName()));
+        medicineList.setItems(medNames);
         medicineChoice.setItems(medNames);
 
         ObservableList<String> agvNames = FXCollections.observableArrayList();
         agvs.forEach(a -> agvNames.add(a.getName()));
+        agvList.setItems(agvNames);
         agvChoice.setItems(agvNames);
 
         stationChoice.setItems(FXCollections.observableArrayList(chargingStations));
@@ -118,10 +109,9 @@ public class MediTrackController {
         if (!chargingStations.isEmpty()) stationChoice.setValue(chargingStations.get(0));
 
         // button actions
-        // FIX: Replaced lambda function parameters with (ignored) underscore where not needed to clear warnings
-        startDeliveryBtn.setOnAction(_ -> handleStartDelivery()); // Fixed/Checked
-        chargeAgvBtn.setOnAction(_ -> handleChargeSelectedAgv()); // Fixed/Checked
-        placeOrderBtn.setOnAction(_ -> handlePlaceOrder()); // Fixed/Checked
+        startDeliveryBtn.setOnAction(e -> handleStartDelivery());
+        chargeAgvBtn.setOnAction(e -> handleChargeSelectedAgv());
+        placeOrderBtn.setOnAction(e -> handlePlaceOrder());
     }
 
     private void startBatteryAndAgvMonitoring() {
@@ -182,7 +172,7 @@ public class MediTrackController {
             return;
         }
 
-        // Run delivery on executor
+        // run delivery on executor
         scheduler.execute(() -> runDelivery(selectedAgv, source, dest, medTemplate, qty));
     }
 
@@ -203,7 +193,6 @@ public class MediTrackController {
         agv.setCurrentTask("Picking up " + qty + " x " + medicineTemplate.getName());
         agv.setCurrentLocation(source.getName());
         refreshAgvList();
-        refreshWarehouseList(); // Update warehouse list after stock change
         logAsync(agv.getName() + " assigned: Pick up " + qty + " units of " + medicineTemplate.getName() + " from " + source.getName() + " to " + dest.getName());
 
         // simulate pickup time
@@ -212,7 +201,6 @@ public class MediTrackController {
         // simulate travel
         agv.setCurrentTask("Traveling to " + dest.getName());
         logAsync(agv.getName() + " traveling to " + dest.getName() + "...");
-        refreshAgvList(); // Update AGV status while traveling
         sleepMillis(1500 + random.nextInt(3000));
 
         // deliver: could create new stock at destination if warehouse exists; here just log delivery
@@ -250,7 +238,7 @@ public class MediTrackController {
         agv.setStatus(AGV.Status.CHARGING);
         agv.setCurrentTask("Charging at " + chooseChargingStation());
         refreshAgvList();
-        log("Manual charging started for " + agv.getName());
+        logAsync(agv.getName() + " started manual charging.");
     }
 
     private void handlePlaceOrder() {
@@ -288,17 +276,10 @@ public class MediTrackController {
         return chargingStations.get(random.nextInt(chargingStations.size()));
     }
 
-    // --- REFRESH METHODS UPDATED TO AVOID MISSING toDisplayString() METHODS ---
-
     private void refreshAgvList() {
         Platform.runLater(() -> {
             ObservableList<String> items = FXCollections.observableArrayList();
-            // Using AGV properties directly to form a display string
-            for (AGV a : agvs) {
-                String task = a.getCurrentTask() != null ? " - Task: " + a.getCurrentTask() : "";
-                items.add(String.format("%s (%d%%) | Status: %s%s", 
-                    a.getName(), a.getBatteryLevel(), a.getStatus(), task));
-            }
+            for (AGV a : agvs) items.add(a.toDisplayString());
             agvList.setItems(items);
         });
     }
@@ -306,36 +287,10 @@ public class MediTrackController {
     private void refreshWarehouseList() {
         Platform.runLater(() -> {
             ObservableList<String> items = FXCollections.observableArrayList();
-            // Using Warehouse name and stock count directly
-            for (Warehouse w : warehouses) {
-                // Assuming getMedicines() returns a collection and getSize() is available or size() works
-                int totalStock = w.getMedicines().stream().mapToInt(Medicine::getQuantity).sum();
-                items.add(String.format("%s (ID: %s) | Stock Items: %d", w.getName(), w.getId(), totalStock));
-            }
+            for (Warehouse w : warehouses) items.add(w.toDisplayString());
             warehouseList.setItems(items);
         });
     }
-
-    private void refreshHospitalList() {
-        // FIX: Removed call to h.toDisplayString() which caused the InvocationTargetException/Unresolved compilation problem
-        Platform.runLater(() -> {
-            ObservableList<String> items = FXCollections.observableArrayList();
-            // Using Hospital name and location directly
-            for (Hospital h : hospitals) items.add(h.getName() + " (" + h.getLocation() + ")");
-            hospitalList.setItems(items);
-        });
-    }
-
-    private void refreshMedicineList() {
-        Platform.runLater(() -> {
-            ObservableList<String> items = FXCollections.observableArrayList();
-            // Display medicine name
-            for (Medicine m : medicines) items.add(m.getName());
-            medicineList.setItems(items);
-        });
-    }
-    
-    // --- UPDATED LOG METHOD (Removed timestamp) ---
 
     private void log(String msg) {
         Platform.runLater(() -> {
