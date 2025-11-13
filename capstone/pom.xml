@@ -14,6 +14,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>22</maven.compiler.source>
     <maven.compiler.target>22</maven.compiler.target>
+    <javafx.version>22.0.1</javafx.version> <!-- Added JavaFX Version -->
   </properties>
 
   <dependencyManagement>
@@ -36,6 +37,24 @@
   </dependencyManagement>
 
   <dependencies>
+    <!-- === JAVAFX DEPENDENCIES (CRITICAL FOR YOUR NEW UI) === -->
+    <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-controls</artifactId>
+        <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-fxml</artifactId>
+        <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-graphics</artifactId>
+        <version>${javafx.version}</version>
+    </dependency>
+    <!-- === END JAVAFX DEPENDENCIES === -->
+    
     <dependency>
 	  <groupId>org.junit.jupiter</groupId>
 	  <artifactId>junit-jupiter</artifactId>
@@ -56,4 +75,30 @@
 	  <scope>runtime</scope>
 	</dependency>
   </dependencies>
+  
+  <build>
+    <plugins>
+        <!-- Compiler Plugin to enforce JDK 22 compatibility -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.11.0</version>
+            <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+            </configuration>
+        </plugin>
+        
+        <!-- JAVAFX PLUGIN (REQUIRED FOR LAUNCHING) -->
+        <plugin>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-maven-plugin</artifactId>
+            <version>0.0.8</version>
+            <configuration>
+                <!-- Sets the main class for the JavaFX application based on your project structure -->
+                <mainClass>de.fhdo.sama.capstone.App</mainClass>
+            </configuration>
+        </plugin>
+    </plugins>
+  </build>
 </project>

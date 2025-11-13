@@ -1,62 +1,37 @@
 package de.fhdo.sama.capstone.model;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class Warehouse {
-	private String id;
-	private String name;
-	private List<Medicine> stock;
-	private Location location;
+    private final String id;
+    private final String name;
+    private final Location location;
+    private final List<Medicine> medicines = new ArrayList<>();
 
-	public Warehouse(String name, List<Medicine> stock, Location location) {
-		this.name = name;
-		this.stock = stock;
-		this.location = location;
-	}
+    public Warehouse(String id, String name, Location location) {
+        this.id = id; this.name = name; this.location = location;
+    }
 
-	public List<Medicine> getStock() {
-		return stock;
-	}
+    // copy-constructor helper
+    public void addMedicine(Medicine m) { medicines.add(m); }
+    public List<Medicine> getMedicines() { return medicines; }
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public Location getLocation() { return location; }
 
-	public void setStock(List<Medicine> stock) {
-		this.stock = stock;
-	}
+    public boolean removeMedicineByName(String name, int qty) {
+        Optional<Medicine> opt = medicines.stream().filter(m -> m.getName().equals(name)).findFirst();
+        if (opt.isEmpty()) return false;
+        Medicine m = opt.get();
+        if (m.getQuantity() < qty) return false;
+        m.setQuantity(m.getQuantity() - qty);
+        return true;
+    }
 
-	public Location getLocation() {
-		return location;
-	}
-
-	public void setLocation(Location location) {
-		this.location = location;
-	}
-
-	public String getId() {
-		return id;
-	}
-
-	public void setId(String id) {
-		this.id = id;
-	}
-
-	public String getName() {
-		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	public boolean removeMedicine(String medicineName, int quantity) {
-		for (Medicine medicine : stock) {
-			if (medicine.getName().equals(medicineName) && medicine.getQuantity() >= quantity) {
-				medicine.setQuantity(medicine.getQuantity() - quantity);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	public void addMedicine(Medicine medicine) {
-		stock.add(medicine);
-	}
+    public String toDisplayString() {
+        int total = medicines.stream().mapToInt(Medicine::getQuantity).sum();
+        return name + " (" + total + " items)";
+    }
 }

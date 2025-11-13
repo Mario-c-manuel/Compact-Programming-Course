@@ -1,51 +1,33 @@
 package de.fhdo.sama.capstone.model;
 
 public class AGV {
-	private String id;
-	private String name;
-	private int batteryLevel;
-	private String currentTask;
+    public enum Status { IDLE, ON_TASK, CHARGING, MAINTENANCE }
 
-	public AGV(String name) {
-		this.name = name;
-		this.batteryLevel = 100; // Default battery level
-	}
+    private final String id;
+    private final String name;
+    private Status status;
+    private int batteryLevel;
+    private String currentLocation;
+    private String currentTask;
 
-	public String getId() {
-		return id;
-	}
+    public AGV(String id, String name, Status status, int batteryLevel, String location, String currentTask) {
+        this.id = id; this.name = name; this.status = status; this.batteryLevel = batteryLevel;
+        this.currentLocation = location; this.currentTask = currentTask;
+    }
 
-	public void setId(String id) {
-		this.id = id;
-	}
+    public String getId() { return id; }
+    public String getName() { return name; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public int getBatteryLevel() { return batteryLevel; }
+    public void setBatteryLevel(int batteryLevel) { this.batteryLevel = batteryLevel; }
+    public String getCurrentLocation() { return currentLocation; }
+    public void setCurrentLocation(String currentLocation) { this.currentLocation = currentLocation; }
+    public String getCurrentTask() { return currentTask; }
+    public void setCurrentTask(String currentTask) { this.currentTask = currentTask; }
 
-	public String getName() {
-		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	public int getBatteryLevel() {
-		return batteryLevel;
-	}
-
-	public void setBatteryLevel(int batteryLevel) {
-		this.batteryLevel = batteryLevel;
-	}
-
-	public String getCurrentTask() {
-		return currentTask;
-	}
-
-	public void setCurrentTask(String currentTask) {
-		this.currentTask = currentTask;
-	}
-
-	public void executeTask(String task) {
-		this.currentTask = task;
-		// Simulate task execution
-		System.out.println(name + " is executing task: " + task);
-	}
+    public String toDisplayString() {
+        String task = (currentTask == null) ? "" : " - " + currentTask;
+        return name + " | " + status + " | " + batteryLevel + "% " + task;
+    }
 }
