@@ -8,7 +8,9 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.scene.control.*;
+import javafx.scene.layout.GridPane;
 
 import de.fhdo.sama.capstone.model.*;
 
@@ -122,6 +124,77 @@ public class MediTrackController {
         startDeliveryBtn.setOnAction(_ -> handleStartDelivery()); // Fixed/Checked
         chargeAgvBtn.setOnAction(_ -> handleChargeSelectedAgv()); // Fixed/Checked
         placeOrderBtn.setOnAction(_ -> handlePlaceOrder()); // Fixed/Checked
+        
+        // Set up custom cell factory for warehouse list to handle double-clicks
+        warehouseList.setCellFactory(listView -> {
+            ListCell<String> cell = new ListCell<String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(item);
+                    }
+                }
+            };
+            
+            // Handle double-click on the cell
+            cell.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !cell.isEmpty()) {
+                    String selectedItem = cell.getItem();
+                    int selectedIndex = cell.getIndex();
+                    if (selectedItem != null) {
+                        ObservableList<String> items = warehouseList.getItems();
+                        Warehouse warehouse = findWarehouseFromListItem(selectedItem, selectedIndex, items);
+                        if (warehouse != null) {
+                            showRestockDialog(warehouse);
+                        }
+                    }
+                }
+            });
+            
+            return cell;
+        });
+    }
+    
+    private Warehouse findWarehouseFromListItem(String selectedItem, int selectedIndex, ObservableList<String> items) {
+        // Check if it's a warehouse header line (starts with ">>")
+        if (selectedItem.startsWith(">>")) {
+            // Extract warehouse name from format: ">> WarehouseName (ID: wh1):"
+            String warehouseName = selectedItem.substring(2).trim(); // Remove ">>"
+            if (warehouseName.contains(" (ID:")) {
+                warehouseName = warehouseName.substring(0, warehouseName.indexOf(" (ID:")).trim();
+            } else if (warehouseName.endsWith(":")) {
+                warehouseName = warehouseName.substring(0, warehouseName.length() - 1).trim();
+            }
+            
+            final String finalWarehouseName = warehouseName;
+            return warehouses.stream()
+                .filter(w -> w.getName().equals(finalWarehouseName))
+                .findFirst()
+                .orElse(null);
+        } else {
+            // If clicking on a medicine line, find the parent warehouse
+            // Look backwards in the list to find the warehouse header
+            for (int i = selectedIndex; i >= 0; i--) {
+                String item = items.get(i);
+                if (item.startsWith(">>")) {
+                    String warehouseName = item.substring(2).trim();
+                    if (warehouseName.contains(" (ID:")) {
+                        warehouseName = warehouseName.substring(0, warehouseName.indexOf(" (ID:")).trim();
+                    } else if (warehouseName.endsWith(":")) {
+                        warehouseName = warehouseName.substring(0, warehouseName.length() - 1).trim();
+                    }
+                    final String finalWarehouseName = warehouseName;
+                    return warehouses.stream()
+                        .filter(w -> w.getName().equals(finalWarehouseName))
+                        .findFirst()
+                        .orElse(null);
+                }
+            }
+        }
+        return null;
     }
 
     private void startBatteryAndAgvMonitoring() {
@@ -357,6 +430,221 @@ public class MediTrackController {
     private void logAsync(String msg) {
         // off-thread call-safe log
         log(msg);
+    }
+
+    private void showRestockDialog(Warehouse warehouse) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Restock Warehouse: " + warehouse.getName());
+        dialog.setHeaderText("Add stock to existing medicine or add a new medicine");
+
+        // Create dialog content
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+
+        // Toggle for new medicine vs existing
+        CheckBox addNewMedicineCheck = new CheckBox("Add new medicine (not in dropdown)");
+        grid.add(addNewMedicineCheck, 0, 0, 2, 1);
+
+        // Medicine dropdown (for existing medicines)
+        Label medicineLabel = new Label("Medicine:");
+        ChoiceBox<String> medicineDropdown = new ChoiceBox<>();
+        ObservableList<String> medicineNames = FXCollections.observableArrayList();
+        medicines.forEach(m -> medicineNames.add(m.getName()));
+        medicineDropdown.setItems(medicineNames);
+        if (!medicineNames.isEmpty()) {
+            medicineDropdown.setValue(medicineNames.get(0));
+        }
+        grid.add(medicineLabel, 0, 1);
+        grid.add(medicineDropdown, 1, 1);
+
+        // New medicine fields (initially hidden)
+        Label newMedicineNameLabel = new Label("Medicine Name:");
+        TextField newMedicineNameField = new TextField();
+        newMedicineNameField.setPromptText("Enter medicine name");
+        newMedicineNameLabel.setVisible(false);
+        newMedicineNameField.setVisible(false);
+
+        Label expiryDateLabel = new Label("Expiry Date (YYYY-MM-DD):");
+        TextField expiryDateField = new TextField();
+        expiryDateField.setPromptText("2025-12-31");
+        expiryDateLabel.setVisible(false);
+        expiryDateField.setVisible(false);
+
+        Label locationLabel = new Label("Storage Location:");
+        TextField locationField = new TextField();
+        locationField.setPromptText("e.g., Shelf A1");
+        locationLabel.setVisible(false);
+        locationField.setVisible(false);
+
+        // Add new medicine fields to grid (will be hidden initially)
+        grid.add(newMedicineNameLabel, 0, 1);
+        grid.add(newMedicineNameField, 1, 1);
+        grid.add(expiryDateLabel, 0, 2);
+        grid.add(expiryDateField, 1, 2);
+        grid.add(locationLabel, 0, 3);
+        grid.add(locationField, 1, 3);
+
+        // Quantity field (always visible, positioned at row 4 to be after all fields)
+        Label quantityLabel = new Label("Quantity to Add:");
+        TextField quantityField = new TextField();
+        quantityField.setPromptText("Enter quantity");
+        grid.add(quantityLabel, 0, 4);
+        grid.add(quantityField, 1, 4);
+
+        // Toggle visibility of new medicine fields
+        addNewMedicineCheck.setOnAction(_ -> {
+            boolean isNew = addNewMedicineCheck.isSelected();
+            medicineLabel.setVisible(!isNew);
+            medicineDropdown.setVisible(!isNew);
+            newMedicineNameLabel.setVisible(isNew);
+            newMedicineNameField.setVisible(isNew);
+            expiryDateLabel.setVisible(isNew);
+            expiryDateField.setVisible(isNew);
+            locationLabel.setVisible(isNew);
+            locationField.setVisible(isNew);
+        });
+
+        dialog.getDialogPane().setContent(grid);
+
+        // Add buttons
+        ButtonType restockButtonType = new ButtonType("Restock", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(restockButtonType, ButtonType.CANCEL);
+
+        // Validate and process
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == restockButtonType) {
+                return restockButtonType;
+            }
+            return null;
+        });
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get() == restockButtonType) {
+            handleRestock(warehouse, addNewMedicineCheck.isSelected(), medicineDropdown.getValue(),
+                newMedicineNameField.getText(), quantityField.getText(), expiryDateField.getText(),
+                locationField.getText());
+        }
+    }
+
+    private void handleRestock(Warehouse warehouse, boolean isNewMedicine, String selectedMedicineName,
+                               String newMedicineName, String quantityText, String expiryDateText,
+                               String locationText) {
+        // Validate quantity
+        int quantity;
+        try {
+            quantity = Integer.parseInt(quantityText.trim());
+            if (quantity <= 0) {
+                log("Invalid quantity. Enter a positive integer.");
+                return;
+            }
+        } catch (NumberFormatException ex) {
+            log("Invalid quantity. Enter a positive integer.");
+            return;
+        }
+
+        if (isNewMedicine) {
+            // Validate new medicine fields
+            if (newMedicineName == null || newMedicineName.trim().isEmpty()) {
+                log("Medicine name is required.");
+                return;
+            }
+            if (expiryDateText == null || expiryDateText.trim().isEmpty()) {
+                log("Expiry date is required (format: YYYY-MM-DD).");
+                return;
+            }
+            if (locationText == null || locationText.trim().isEmpty()) {
+                log("Storage location is required.");
+                return;
+            }
+
+            LocalDate expiryDate;
+            try {
+                expiryDate = LocalDate.parse(expiryDateText.trim());
+            } catch (Exception ex) {
+                log("Invalid expiry date format. Use YYYY-MM-DD.");
+                return;
+            }
+
+            // Use default values for removed fields
+            String category = "General"; // Default category
+            int reorderPoint = 100; // Default reorder point
+            double unitPrice = 0.0; // Default unit price
+
+            // Check if medicine already exists in warehouse
+            Optional<Medicine> existing = warehouse.findMedicineByName(newMedicineName.trim());
+            if (existing.isPresent()) {
+                // Medicine exists, just restock it
+                warehouse.restockMedicine(newMedicineName.trim(), quantity);
+                log("Restocked " + quantity + " units of " + newMedicineName.trim() + " in " + warehouse.getName());
+            } else {
+                // Create new medicine
+                String newMedId = "med" + (medicines.size() + 1);
+                Medicine newMedicine = new Medicine(
+                    newMedId,
+                    newMedicineName.trim(),
+                    quantity,
+                    expiryDate,
+                    warehouse.getId(),
+                    locationText.trim(),
+                    category,
+                    reorderPoint,
+                    unitPrice
+                );
+                warehouse.addMedicineStock(newMedicine);
+                // Also add to global medicines list if not already there
+                if (medicines.stream().noneMatch(m -> m.getName().equals(newMedicineName.trim()))) {
+                    medicines.add(new Medicine(newMedicine));
+                }
+                log("Added new medicine: " + newMedicineName.trim() + " (" + quantity + " units) to " + warehouse.getName());
+            }
+        } else {
+            // Restock existing medicine
+            if (selectedMedicineName == null) {
+                log("Please select a medicine from the dropdown.");
+                return;
+            }
+
+            // Check if medicine exists in warehouse
+            Optional<Medicine> existing = warehouse.findMedicineByName(selectedMedicineName);
+            if (existing.isPresent()) {
+                warehouse.restockMedicine(selectedMedicineName, quantity);
+                log("Restocked " + quantity + " units of " + selectedMedicineName + " in " + warehouse.getName());
+            } else {
+                // Medicine doesn't exist in warehouse, add it
+                Medicine template = medicines.stream()
+                    .filter(m -> m.getName().equals(selectedMedicineName))
+                    .findFirst()
+                    .orElse(null);
+                if (template != null) {
+                    Medicine newStock = new Medicine(
+                        template.getId(),
+                        template.getName(),
+                        quantity,
+                        template.getExpiryDate(),
+                        warehouse.getId(),
+                        template.getLocation(),
+                        template.getCategory(),
+                        template.getReorderPoint(),
+                        template.getUnitPrice()
+                    );
+                    warehouse.addMedicineStock(newStock);
+                    log("Added " + quantity + " units of " + selectedMedicineName + " to " + warehouse.getName());
+                } else {
+                    log("Medicine template not found.");
+                    return;
+                }
+            }
+        }
+
+        // Refresh UI
+        refreshWarehouseList();
+        refreshMedicineList();
+        // Update medicine choice box
+        ObservableList<String> medNames = FXCollections.observableArrayList();
+        medicines.forEach(m -> medNames.add(m.getName()));
+        medicineChoice.setItems(medNames);
     }
 
     private void sleepMillis(long ms) {
