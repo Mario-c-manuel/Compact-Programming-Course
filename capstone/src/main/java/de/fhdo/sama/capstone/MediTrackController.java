@@ -11,12 +11,13 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.stage.Modality;
+import javafx.stage.Stage; // added import
 
 import de.fhdo.sama.capstone.model.*;
 
 public class MediTrackController {
 
-    // --- FXML UI Elements reverted to use String for simpler ListViews ---
     @FXML private ListView<String> warehouseList;
     @FXML private ListView<String> hospitalList;
     @FXML private ListView<String> medicineList;
@@ -34,7 +35,6 @@ public class MediTrackController {
     @FXML private Button placeOrderBtn;
     @FXML private TextArea logArea;
 
-    // in-memory data
     private final List<Warehouse> warehouses = new ArrayList<>();
     private final List<Hospital> hospitals = new ArrayList<>();
     private final List<Medicine> medicines = new ArrayList<>();
@@ -46,11 +46,9 @@ public class MediTrackController {
 
     @FXML
     public void initialize() {
-        // Use Platform.runLater to ensure initialization runs after the FXML has fully loaded
         Platform.runLater(() -> {
             loadInitialMockData();
             bindUI();
-            // Call refresh methods to populate lists immediately
             refreshWarehouseList();
             refreshHospitalList();
             refreshMedicineList();
@@ -61,39 +59,37 @@ public class MediTrackController {
     }
 
     private void loadInitialMockData() {
-        // Charging stations
         chargingStations.addAll(Arrays.asList("Station 1", "Station 2", "Station 3"));
 
-        // Warehouses and medicines
-        Warehouse w1 = new Warehouse("wh1", "Main Warehouse", new Location("W1", "Main Warehouse", 0, 0));
-        Warehouse w2 = new Warehouse("wh2", "Secondary Warehouse", new Location("W2", "Secondary Warehouse", 50, 0));
+        Warehouse w1 = new Warehouse("wh1", "MedHub 1", new Location("W1", "Reinoldkirche", 0, 0));
+        Warehouse w2 = new Warehouse("wh2", "MedHub 2", new Location("W2", "Hombruch", 50, 0));
         warehouses.addAll(Arrays.asList(w1, w2));
 
-        // Note: medicines here represents all available types, not current stock
-        medicines.add(new Medicine("med1", "Artemether/Lumefantrine (20/120mg)", 2500, LocalDate.parse("2025-12-31"), "wh1", "Shelf A1", "Antimalarial", 500, 3.50));
-        medicines.add(new Medicine("med2", "Azithromycin 500mg", 90, LocalDate.parse("2024-10-31"), "wh2", "Rack B2", "Antibiotic", 150, 0.75));
-        medicines.add(new Medicine("med3", "TLD (Tenofovir/Lamivudine/Dolutegravir)", 800, LocalDate.parse("2026-06-30"), "wh1", "Shelf A2", "Antiretroviral", 200, 7.20));
-
-        // populate warehouses with medicine references (actual stock)
+        medicines.add(new Medicine("med1", "Paracetamol 500mg", 5000, LocalDate.parse("2025-12-31"), "wh1", "Shelf A1", "Pain Relief", 1000, 0.10));
+        medicines.add(new Medicine("med2", "Ibuprofen 200mg", 2700, LocalDate.parse("2024-10-31"), "wh2", "Rack B2", "Anti-inflammatory", 200, 0.50));
+        medicines.add(new Medicine("med3", "Aspirin 81mg", 2200, LocalDate.parse("2026-06-30"), "wh1", "Shelf A2", "Antiplatelet", 300, 0.35));
+        medicines.add(new Medicine("med4", "Cetirizine 10mg", 4600, LocalDate.parse("2025-05-15"), "wh2", "Rack C3", "Antihistamine", 150, 0.55));
+        medicines.add(new Medicine("med5", "Beandryl 250mg", 3000, LocalDate.parse("2027-01-01"), "wh1", "Shelf D4", "Antibiotic", 500, 0.20));
+        
         for (Medicine m : medicines) {
             Warehouse target = warehouses.stream().filter(w -> w.getId().equals(m.getWarehouseId())).findFirst().orElse(warehouses.get(0));
             target.addMedicine(new Medicine(m)); // add a copy
         }
 
         // Hospitals
-        // Assuming Hospital constructor is Hospital(String id, String name, String location)
-        hospitals.add(new Hospital("h1", "City Hospital", "Nairobi, Kenya"));
-        hospitals.add(new Hospital("h2", "Rural Clinic", "Outskirts"));
+        // Hospital constructor is Hospital(String id, String name, String location)
+        hospitals.add(new Hospital("h1", "City Hospital", "Dorstfeld, Dortmund"));
+        hospitals.add(new Hospital("h2", "Private Hospital", "Innenstadt, Dortmund"));
+        hospitals.add(new Hospital("h3", "Rural Clinic", "Outskirts"));
 
         // AGVs
-        // Assuming AGV constructor is AGV(String id, String name, Status status, int battery, String location, String task)
-        agvs.add(new AGV("agv-001", "PharmaBot Alpha", AGV.Status.IDLE, 85, "Main Warehouse", null));
-        agvs.add(new AGV("agv-002", "PharmaBot Beta", AGV.Status.CHARGING, 22, "Main Warehouse", null));
-        agvs.add(new AGV("agv-003", "MediMover Gamma", AGV.Status.ON_TASK, 67, "Mogadishu MedHub", "Transferring Azithromycin"));
+        // AGV constructor is AGV(String id, String name, Status status, int battery, String location, String task)
+        agvs.add(new AGV("agv-001", "AsusOne Alpha", AGV.Status.IDLE, 85, "Reinoldkirche", null));
+        agvs.add(new AGV("agv-002", "PharmaBot Beta", AGV.Status.CHARGING, 22, "Reinoldkirche", null));
+        agvs.add(new AGV("agv-003", "MediMover Gamma", AGV.Status.IDLE, 67, "Hombruch", null));
     }
 
     private void bindUI() {
-        // Lists for ChoiceBoxes (using names)
         ObservableList<String> whNames = FXCollections.observableArrayList();
         warehouses.forEach(w -> whNames.add(w.getName()));
         warehouseChoice.setItems(whNames);
@@ -119,13 +115,10 @@ public class MediTrackController {
         if (!agvNames.isEmpty()) agvChoice.setValue(agvNames.get(0));
         if (!chargingStations.isEmpty()) stationChoice.setValue(chargingStations.get(0));
 
-        // button actions
-        // FIX: Replaced lambda function parameters with (ignored) underscore where not needed to clear warnings
-        startDeliveryBtn.setOnAction(_ -> handleStartDelivery()); // Fixed/Checked
-        chargeAgvBtn.setOnAction(_ -> handleChargeSelectedAgv()); // Fixed/Checked
-        placeOrderBtn.setOnAction(_ -> handlePlaceOrder()); // Fixed/Checked
+        startDeliveryBtn.setOnAction(_ -> handleStartDelivery()); 
+        chargeAgvBtn.setOnAction(_ -> handleChargeSelectedAgv()); 
+        placeOrderBtn.setOnAction(_ -> handlePlaceOrder()); 
         
-        // Set up custom cell factory for warehouse list to handle double-clicks
         warehouseList.setCellFactory(listView -> {
             ListCell<String> cell = new ListCell<String>() {
                 @Override
@@ -139,7 +132,6 @@ public class MediTrackController {
                 }
             };
             
-            // Handle double-click on the cell
             cell.setOnMouseClicked(event -> {
                 if (event.getClickCount() == 2 && !cell.isEmpty()) {
                     String selectedItem = cell.getItem();
@@ -159,9 +151,7 @@ public class MediTrackController {
     }
     
     private Warehouse findWarehouseFromListItem(String selectedItem, int selectedIndex, ObservableList<String> items) {
-        // Check if it's a warehouse header line (starts with ">>")
         if (selectedItem.startsWith(">>")) {
-            // Extract warehouse name from format: ">> WarehouseName (ID: wh1):"
             String warehouseName = selectedItem.substring(2).trim(); // Remove ">>"
             if (warehouseName.contains(" (ID:")) {
                 warehouseName = warehouseName.substring(0, warehouseName.indexOf(" (ID:")).trim();
@@ -175,8 +165,6 @@ public class MediTrackController {
                 .findFirst()
                 .orElse(null);
         } else {
-            // If clicking on a medicine line, find the parent warehouse
-            // Look backwards in the list to find the warehouse header
             for (int i = selectedIndex; i >= 0; i--) {
                 String item = items.get(i);
                 if (item.startsWith(">>")) {
@@ -198,7 +186,6 @@ public class MediTrackController {
     }
 
     private void startBatteryAndAgvMonitoring() {
-        // drain battery for ON_TASK AGVs and charge for CHARGING
         scheduler.scheduleAtFixedRate(() -> {
             boolean changed = false;
             for (AGV a : agvs) {
@@ -255,53 +242,43 @@ public class MediTrackController {
             return;
         }
 
-        // Run delivery on executor
         scheduler.execute(() -> runDelivery(selectedAgv, source, dest, medTemplate, qty));
     }
 
     private void runDelivery(AGV agv, Warehouse source, Hospital dest, Medicine medicineTemplate, int qty) {
         synchronized (source) {
-            // check stock
             Optional<Medicine> stockOpt = source.getMedicines().stream().filter(m -> m.getName().equals(medicineTemplate.getName())).findFirst();
             if (stockOpt.isEmpty() || stockOpt.get().getQuantity() < qty) {
                 logAsync("Order failed: Not enough stock of " + medicineTemplate.getName() + " at " + source.getName());
                 return;
             }
-            // reserve / reduce source immediately
             stockOpt.get().setQuantity(stockOpt.get().getQuantity() - qty);
         }
 
-        // assign AGV
         agv.setStatus(AGV.Status.ON_TASK);
         agv.setCurrentTask("Picking up " + qty + " x " + medicineTemplate.getName());
         agv.setCurrentLocation(source.getName());
         refreshAgvList();
-        refreshWarehouseList(); // Update warehouse list after stock change
+        refreshWarehouseList(); 
         logAsync(agv.getName() + " assigned: Pick up " + qty + " units of " + medicineTemplate.getName() + " from " + source.getName() + " to " + dest.getName());
 
-        // simulate pickup time
         sleepMillis(1000 + random.nextInt(2000));
 
-        // simulate travel
         agv.setCurrentTask("Traveling to " + dest.getName());
         logAsync(agv.getName() + " traveling to " + dest.getName() + "...");
-        refreshAgvList(); // Update AGV status while traveling
+        refreshAgvList(); 
         sleepMillis(1500 + random.nextInt(3000));
 
-        // deliver: could create new stock at destination if warehouse exists; here just log delivery
         agv.setCurrentTask("Delivering " + qty + " x " + medicineTemplate.getName());
         logAsync(agv.getName() + " delivered " + qty + " units of " + medicineTemplate.getName() + " to " + dest.getName());
 
-        // after delivery, battery drains
         agv.setBatteryLevel(Math.max(0, agv.getBatteryLevel() - (10 + random.nextInt(10))));
 
-        // decide whether to go charge or return to idle
-        if (agv.getBatteryLevel() <= 20) {
+        if (agv.getBatteryLevel() <= 30) {
             String station = chooseChargingStation();
             agv.setCurrentTask("Going to charge at " + station);
             agv.setStatus(AGV.Status.CHARGING);
             logAsync(agv.getName() + " going to charge at " + station + ".");
-            // charging will be handled by scheduled updater
         } else {
             agv.setStatus(AGV.Status.IDLE);
             agv.setCurrentTask(null);
@@ -319,7 +296,6 @@ public class MediTrackController {
         AGV agv = agvs.stream().filter(a -> a.getName().equals(agvName)).findFirst().orElse(null);
         if (agv == null) { log("AGV not found."); return; }
 
-        // set to charging and schedule immediate charging simulation
         agv.setStatus(AGV.Status.CHARGING);
         agv.setCurrentTask("Charging at " + chooseChargingStation());
         refreshAgvList();
@@ -361,12 +337,10 @@ public class MediTrackController {
         return chargingStations.get(random.nextInt(chargingStations.size()));
     }
 
-    // --- REFRESH METHODS UPDATED TO AVOID MISSING toDisplayString() METHODS ---
 
     private void refreshAgvList() {
         Platform.runLater(() -> {
             ObservableList<String> items = FXCollections.observableArrayList();
-            // Using AGV properties directly to form a display string
             for (AGV a : agvs) {
                 String task = a.getCurrentTask() != null ? " - Task: " + a.getCurrentTask() : "";
                 items.add(String.format("%s (%d%%) | Status: %s%s", 
@@ -379,12 +353,9 @@ public class MediTrackController {
     private void refreshWarehouseList() {
         Platform.runLater(() -> {
             ObservableList<String> items = FXCollections.observableArrayList();
-            // Display warehouse with individual medicine stock items
             for (Warehouse w : warehouses) {
-                // Add warehouse header
                 items.add(String.format(">> %s (ID: %s):", w.getName(), w.getId()));
                 
-                // Add each medicine with its quantity
                 List<Medicine> medicines = w.getMedicines();
                 if (medicines.isEmpty()) {
                     items.add("    - No medicines in stock");
@@ -393,7 +364,6 @@ public class MediTrackController {
                         items.add(String.format("    - %s: %d units", m.getName(), m.getQuantity()));
                     }
                 }
-                // Add empty line between warehouses for readability
                 items.add("");
             }
             warehouseList.setItems(items);
@@ -401,10 +371,8 @@ public class MediTrackController {
     }
 
     private void refreshHospitalList() {
-        // FIX: Removed call to h.toDisplayString() which caused the InvocationTargetException/Unresolved compilation problem
         Platform.runLater(() -> {
             ObservableList<String> items = FXCollections.observableArrayList();
-            // Using Hospital name and location directly
             for (Hospital h : hospitals) items.add(h.getName() + " (" + h.getLocation() + ")");
             hospitalList.setItems(items);
         });
@@ -413,13 +381,11 @@ public class MediTrackController {
     private void refreshMedicineList() {
         Platform.runLater(() -> {
             ObservableList<String> items = FXCollections.observableArrayList();
-            // Display medicine name
             for (Medicine m : medicines) items.add(m.getName());
             medicineList.setItems(items);
         });
     }
     
-    // --- UPDATED LOG METHOD (Removed timestamp) ---
 
     private void log(String msg) {
         Platform.runLater(() -> {
@@ -428,7 +394,6 @@ public class MediTrackController {
     }
 
     private void logAsync(String msg) {
-        // off-thread call-safe log
         log(msg);
     }
 
@@ -437,17 +402,18 @@ public class MediTrackController {
         dialog.setTitle("Restock Warehouse: " + warehouse.getName());
         dialog.setHeaderText("Add stock to existing medicine or add a new medicine");
 
-        // Create dialog content
+        // make the dialog owned by the application's window and modal (keeps it on top)
+        dialog.initOwner(warehouseList.getScene().getWindow());
+        dialog.initModality(Modality.WINDOW_MODAL);
+
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
         grid.setPadding(new Insets(20, 150, 10, 10));
 
-        // Toggle for new medicine vs existing
         CheckBox addNewMedicineCheck = new CheckBox("Add new medicine (not in dropdown)");
         grid.add(addNewMedicineCheck, 0, 0, 2, 1);
 
-        // Medicine dropdown (for existing medicines)
         Label medicineLabel = new Label("Medicine:");
         ChoiceBox<String> medicineDropdown = new ChoiceBox<>();
         ObservableList<String> medicineNames = FXCollections.observableArrayList();
@@ -459,7 +425,6 @@ public class MediTrackController {
         grid.add(medicineLabel, 0, 1);
         grid.add(medicineDropdown, 1, 1);
 
-        // New medicine fields (initially hidden)
         Label newMedicineNameLabel = new Label("Medicine Name:");
         TextField newMedicineNameField = new TextField();
         newMedicineNameField.setPromptText("Enter medicine name");
@@ -478,7 +443,6 @@ public class MediTrackController {
         locationLabel.setVisible(false);
         locationField.setVisible(false);
 
-        // Add new medicine fields to grid (will be hidden initially)
         grid.add(newMedicineNameLabel, 0, 1);
         grid.add(newMedicineNameField, 1, 1);
         grid.add(expiryDateLabel, 0, 2);
@@ -486,14 +450,12 @@ public class MediTrackController {
         grid.add(locationLabel, 0, 3);
         grid.add(locationField, 1, 3);
 
-        // Quantity field (always visible, positioned at row 4 to be after all fields)
         Label quantityLabel = new Label("Quantity to Add:");
         TextField quantityField = new TextField();
         quantityField.setPromptText("Enter quantity");
         grid.add(quantityLabel, 0, 4);
         grid.add(quantityField, 1, 4);
 
-        // Toggle visibility of new medicine fields
         addNewMedicineCheck.setOnAction(_ -> {
             boolean isNew = addNewMedicineCheck.isSelected();
             medicineLabel.setVisible(!isNew);
@@ -508,16 +470,24 @@ public class MediTrackController {
 
         dialog.getDialogPane().setContent(grid);
 
-        // Add buttons
         ButtonType restockButtonType = new ButtonType("Restock", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(restockButtonType, ButtonType.CANCEL);
 
-        // Validate and process
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == restockButtonType) {
                 return restockButtonType;
             }
             return null;
+        });
+
+        // ensure the dialog is brought to front and focused when shown
+        dialog.setOnShown(ev -> {
+            Platform.runLater(() -> {
+                // dialog.getDialogPane().getScene().getWindow() returns a Window - cast to Stage to call toFront()
+                Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+                stage.toFront();
+                stage.requestFocus();
+            });
         });
 
         Optional<ButtonType> result = dialog.showAndWait();
@@ -531,7 +501,6 @@ public class MediTrackController {
     private void handleRestock(Warehouse warehouse, boolean isNewMedicine, String selectedMedicineName,
                                String newMedicineName, String quantityText, String expiryDateText,
                                String locationText) {
-        // Validate quantity
         int quantity;
         try {
             quantity = Integer.parseInt(quantityText.trim());
@@ -545,7 +514,6 @@ public class MediTrackController {
         }
 
         if (isNewMedicine) {
-            // Validate new medicine fields
             if (newMedicineName == null || newMedicineName.trim().isEmpty()) {
                 log("Medicine name is required.");
                 return;
@@ -567,10 +535,10 @@ public class MediTrackController {
                 return;
             }
 
-            // Use default values for removed fields
+            // Use default values for other fields
             String category = "General"; // Default category
             int reorderPoint = 100; // Default reorder point
-            double unitPrice = 0.0; // Default unit price
+            double unitPrice = 1.0; // Default unit price
 
             // Check if medicine already exists in warehouse
             Optional<Medicine> existing = warehouse.findMedicineByName(newMedicineName.trim());
@@ -579,7 +547,6 @@ public class MediTrackController {
                 warehouse.restockMedicine(newMedicineName.trim(), quantity);
                 log("Restocked " + quantity + " units of " + newMedicineName.trim() + " in " + warehouse.getName());
             } else {
-                // Create new medicine
                 String newMedId = "med" + (medicines.size() + 1);
                 Medicine newMedicine = new Medicine(
                     newMedId,
@@ -593,26 +560,22 @@ public class MediTrackController {
                     unitPrice
                 );
                 warehouse.addMedicineStock(newMedicine);
-                // Also add to global medicines list if not already there
                 if (medicines.stream().noneMatch(m -> m.getName().equals(newMedicineName.trim()))) {
                     medicines.add(new Medicine(newMedicine));
                 }
                 log("Added new medicine: " + newMedicineName.trim() + " (" + quantity + " units) to " + warehouse.getName());
             }
         } else {
-            // Restock existing medicine
             if (selectedMedicineName == null) {
                 log("Please select a medicine from the dropdown.");
                 return;
             }
 
-            // Check if medicine exists in warehouse
             Optional<Medicine> existing = warehouse.findMedicineByName(selectedMedicineName);
             if (existing.isPresent()) {
                 warehouse.restockMedicine(selectedMedicineName, quantity);
                 log("Restocked " + quantity + " units of " + selectedMedicineName + " in " + warehouse.getName());
             } else {
-                // Medicine doesn't exist in warehouse, add it
                 Medicine template = medicines.stream()
                     .filter(m -> m.getName().equals(selectedMedicineName))
                     .findFirst()
@@ -641,7 +604,7 @@ public class MediTrackController {
         // Refresh UI
         refreshWarehouseList();
         refreshMedicineList();
-        // Update medicine choice box
+
         ObservableList<String> medNames = FXCollections.observableArrayList();
         medicines.forEach(m -> medNames.add(m.getName()));
         medicineChoice.setItems(medNames);

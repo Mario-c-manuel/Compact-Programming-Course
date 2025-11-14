@@ -13,7 +13,7 @@
             <padding>
                 <Insets top="15" right="15" bottom="15" left="15"/>
             </padding>
-            <Label text="MediTrack: Java based AGV Simulation System" style="-fx-font-weight: bold; -fx-font-size: 16pt; -fx-text-fill: #333;"/>
+            <Label text="Delivery and Inventory Management" style="-fx-font-weight: bold; -fx-font-size: 16pt; -fx-text-fill: #333;"/>
             
             <!-- Delivery Controls (Group 1) -->
             <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10; -fx-background-color: #fff;">
@@ -24,7 +24,7 @@
                 <ChoiceBox fx:id="hospitalChoice" prefWidth="180"/>
                 
                 <Label text="AGV:" style="-fx-font-weight: bold;"/>
-                <ChoiceBox fx:id="agvChoice" prefWidth="180"/>
+                <ChoiceBox fx:id="agvChoice" prefWidth="120"/>
                 
                 <Region HBox.hgrow="ALWAYS"/>
                 
@@ -78,7 +78,7 @@
                     <ListView fx:id="agvList" VBox.vgrow="ALWAYS" style="-fx-background-color: #fff; -fx-border-color: #ddd"/>
                 </VBox>
             </HBox>
-	
+
             <!-- Activity Log -->
             <Label text="Activity Log" style="-fx-font-weight: bold; -fx-text-fill: #333;"/>
             <!-- This is line 77: The style attribute has been cleaned to be robust against XML parsing issues -->
